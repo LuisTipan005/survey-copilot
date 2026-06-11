@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Encuesta de Desarrollo Universitario</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
+        .question { background: white; padding: 20px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        label { font-weight: bold; display: block; margin-bottom: 10px; }
+        textarea, select { width: 100%; padding: 8px; margin-top: 5px; }
+        .options label { font-weight: normal; display: inline-block; margin-right: 15px; }
+    </style>
+</head>
+<body>
+    <h2>Encuesta de Tecnologías EPN</h2>
+    
+    <div class="question">
+        <label for="q1">¿Qué opinas sobre el uso de scripts en Python para automatizar tareas locales?</label>
+        <textarea id="q1" rows="3"></textarea>
+    </div>
+
+    <div class="question">
+        <label>¿Qué lenguaje prefieres para Backend?</label>
+        <div class="options">
+            <input type="radio" name="backend_lang" id="b1" value="Java"><label for="b1">Java</label>
+            <input type="radio" name="backend_lang" id="b2" value="Python"><label for="b2">Python</label>
+            <input type="radio" name="backend_lang" id="b3" value="C++"><label for="b3">C++</label>
+        </div>
+    </div>
+
+    <div class="question">
+        <label for="db_select">Motor de Base de Datos principal:</label>
+        <select id="db_select">
+            <option value="MySQL">MySQL</option>
+            <option value="PostgreSQL">PostgreSQL</option>
+            <option value="SQLServer">SQL Server</option>
+        </select>
+    </div>
+</body>
+</html>

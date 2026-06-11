@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Copilot</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="header">
+        <h2>Survey Copilot</h2>
+        <div class="status-indicator">
+            <span id="backendStatus" class="dot red"></span>
+            <span id="statusText">Backend Offline</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <label for="userProfile">User Profile / Tone:</label>
+        <textarea id="userProfile" rows="4" placeholder="Describe your persona...">Estudiante de Ingeniería de Software en la Escuela Politécnica Nacional. Respuestas concisas, analíticas y con enfoque técnico.</textarea>
+        <button id="saveProfileBtn" class="secondary-btn">Save Profile</button>
+        <span id="saveFeedback" class="feedback-text"></span>
+
+        <hr>
+
+        <button id="scanBtn" class="primary-btn">Scan Current Page</button>
+        <div id="actionStatus" class="action-status"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

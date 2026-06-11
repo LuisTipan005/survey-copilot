@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba parcial 1 - Revisión del intento</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8f9fa; color: #343a40; margin: 0; padding: 20px; }
+        .moodle-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border-top: 4px solid #0056b3; }
+        .quiz-header { border-bottom: 1px solid #dee2e6; padding-bottom: 15px; margin-bottom: 25px; }
+        .quiz-header h2 { margin: 0; color: #0056b3; font-size: 24px; }
+        
+        /* Estructura clásica de Moodle */
+        .que { display: none; margin-bottom: 20px; }
+        .que.active { display: block; }
+        .que .info { float: left; width: 7em; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-weight: bold; text-align: center; }
+        .que .content { margin-left: 8.5em; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; background: #ebf5fa; }
+        .que .formulation { margin: 0; }
+        .que .qtext { margin-bottom: 1.5em; font-size: 16px; font-weight: 500; }
+        
+        /* Respuestas Moodle */
+        .que .answer { display: flex; flex-direction: column; gap: 10px; }
+        .que .answer div { display: flex; align-items: baseline; gap: 10px; }
+        .que input[type="radio"] { margin: 0; cursor: pointer; }
+        .que label { cursor: pointer; margin: 0; font-size: 15px; }
+        
+        /* Emparejamiento Moodle */
+        .que.match .answer table { width: 100%; border-collapse: collapse; }
+        .que.match .answer td { padding: 8px 0; }
+        .que.match select { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; width: 100%; max-width: 300px; }
+
+        /* Controles de Navegación */
+        .submitbtns { display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid #dee2e6; padding-top: 20px; }
+        .mod_quiz-next-nav { background-color: #0056b3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background 0.2s; }
+        .mod_quiz-next-nav:hover { background-color: #004494; }
+        .mod_quiz-next-nav:disabled { background-color: #cccccc; cursor: not-allowed; }
+        
+        .progress-indicator { text-align: right; color: #6c757d; font-size: 14px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="moodle-container">
+    <div class="quiz-header">
+        <h2>Prueba parcial 1 - 21/10/2025</h2>
+    </div>
+
+    <div class="progress-indicator">Pregunta <span id="current-q">1</span> de 5</div>
+
+    <div class="que multichoice active" id="q1">
+        <div class="info">Pregunta 1<br><span style="font-size: 12px; font-weight: normal;">Puntúa 1,00</span></div>
+        <div class="content">
+            <div class="formulation">
+                <div class="qtext">¿Cuál de las siguientes afirmaciones describe mejor la función principal de un router?</div>
+                <div class="answer">
+                    <div><input type="radio" name="q1_ans" id="q1_a" value="a"><label for="q1_a">a. Una computadora de escritorio que accede a internet.</label></div>
+                    <div><input type="radio" name="q1_ans" id="q1_b" value="b"><label for="q1_b">b. Un dispositivo que amplifica señales inalámbricas.</label></div>
+                    <div><input type="radio" name="q1_ans" id="q1_c" value="c"><label for="q1_c">c. Un dispositivo que determina la mejor ruta para reenviar paquetes.</label></div>
+                    <div><input type="radio" name="q1_ans" id="q1_d" value="d"><label for="q1_d">d. Un dispositivo que asigna direcciones IP a clientes.</label></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="que match" id="q2">
+        <div class="info">Pregunta 2<br><span style="font-size: 12px; font-weight: normal;">Puntúa 1,00</span></div>
+        <div class="content">
+            <div class="formulation">
+                <div class="qtext">Empareje cada protocolo con su característica principal.</div>
+                <div class="answer">
+                    <table>
+                        <tr>
+                            <td>Telnet</td>
+                            <td>
+                                <select name="q2_telnet" id="q2_telnet">
+                                    <option value="0">Elegir...</option>
+                                    <option value="1">Transferencia de archivos sin cifrado</option>
+                                    <option value="2">Comunicación cifrada y segura</option>
+                                    <option value="3">Protocolo para navegación web</option>
+                                    <option value="4">Transmisión de datos en texto plano</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>FTP</td>
+                            <td>
+                                <select name="q2_ftp" id="q2_ftp">
+                                    <option value="0">Elegir...</option>
+                                    <option value="1">Transferencia de archivos sin cifrado</option>
+                                    <option value="2">Comunicación cifrada y segura</option>
+                                    <option value="3">Protocolo para navegación web</option>
+                                    <option value="4">Transmisión de datos en texto plano</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>HTTP</td>
+                            <td>
+                                <select name="q2_http" id="q2_http">
+                                    <option value="0">Elegir...</option>
+                                    <option value="1">Transferencia de archivos sin cifrado</option>
+                                    <option value="2">Comunicación cifrada y segura</option>
+                                    <option value="3">Protocolo para navegación web</option>
+                                    <option value="4">Transmisión de datos en texto plano</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SSH</td>
+                            <td>
+                                <select name="q2_ssh" id="q2_ssh">
+                                    <option value="0">Elegir...</option>
+                                    <option value="1">Transferencia de archivos sin cifrado</option>
+                                    <option value="2">Comunicación cifrada y segura</option>
+                                    <option value="3">Protocolo para navegación web</option>
+                                    <option value="4">Transmisión de datos en texto plano</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="que multichoice" id="q3">
+        <div class="info">Pregunta 13<br><span style="font-size: 12px; font-weight: normal;">Puntúa 1,00</span></div>
+        <div class="content">
+            <div class="formulation">
+                <div class="qtext">¿Qué valor determina qué ruta se instala en la tabla de enrutamiento cuando hay múltiples opciones?</div>
+                <div class="answer">
+                    <div><input type="radio" name="q3_ans" id="q3_a" value="a"><label for="q3_a">a. El código del protocolo (como para OSPF).</label></div>
+                    <div><input type="radio" name="q3_ans" id="q3_b" value="b"><label for="q3_b">b. La distancia administrativa más baja.</label></div>
+                    <div><input type="radio" name="q3_ans" id="q3_c" value="c"><label for="q3_c">c. El primer protocolo aprendido.</label></div>
+                    <div><input type="radio" name="q3_ans" id="q3_d" value="d"><label for="q3_d">d. La longitud del prefijo más corta.</label></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="que multichoice" id="q4">
+        <div class="info">Pregunta 23<br><span style="font-size: 12px; font-weight: normal;">Puntúa 1,00</span></div>
+        <div class="content">
+            <div class="formulation">
+                <div class="qtext">En la configuración básica de un router, ¿qué comando asegura que las contraseñas no sean visibles en texto claro?</div>
+                <div class="answer">
+                    <div><input type="radio" name="q4_ans" id="q4_a" value="a"><label for="q4_a">a. enable secret X</label></div>
+                    <div><input type="radio" name="q4_ans" id="q4_b" value="b"><label for="q4_b">b. transport input ssh</label></div>
+                    <div><input type="radio" name="q4_ans" id="q4_c" value="c"><label for="q4_c">c. login</label></div>
+                    <div><input type="radio" name="q4_ans" id="q4_d" value="d"><label for="q4_d">d. service password-encryption</label></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="que multichoice" id="q5">
+        <div class="info">Pregunta 26<br><span style="font-size: 12px; font-weight: normal;">Puntúa 1,00</span></div>
+        <div class="content">
+            <div class="formulation">
+                <div class="qtext">¿Cuál es el comando correcto para configurar una ruta estática predeterminada IPv4?</div>
+                <div class="answer">
+                    <div><input type="radio" name="q5_ans" id="q5_a" value="a"><label for="q5_a">a. ip route default 0.0.0.0 0.0.0.0 next-hop</label></div>
+                    <div><input type="radio" name="q5_ans" id="q5_b" value="b"><label for="q5_b">b. ip route 0.0.0.0 0.0.0.0 [next-hop o interfaz]</label></div>
+                    <div><input type="radio" name="q5_ans" id="q5_c" value="c"><label for="q5_c">c. ipv6 route ::/0 next-hop</label></div>
+                    <div><input type="radio" name="q5_ans" id="q5_d" value="d"><label for="q5_d">d. route add default gw next-hop</label></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="submitbtns">
+        <button id="btn-prev" class="mod_quiz-next-nav" disabled>Página anterior</button>
+        <button id="btn-next" class="mod_quiz-next-nav">Siguiente página</button>
+    </div>
+
+</div>
+
+<script>
+    // Lógica de Paginación para simular el comportamiento exacto de Moodle
+    let currentQuestionIndex = 0;
+    const questions = document.querySelectorAll('.que');
+    const btnNext = document.getElementById('btn-next');
+    const btnPrev = document.getElementById('btn-prev');
+    const indicator = document.getElementById('current-q');
+
+    function updateView() {
+        questions.forEach((q, index) => {
+            q.classList.remove('active');
+            if (index === currentQuestionIndex) {
+                q.classList.add('active');
+            }
+        });
+
+        indicator.innerText = currentQuestionIndex + 1;
+        
+        btnPrev.disabled = currentQuestionIndex === 0;
+        
+        if (currentQuestionIndex === questions.length - 1) {
+            btnNext.innerText = "Terminar intento...";
+        } else {
+            btnNext.innerText = "Siguiente página";
+        }
+    }
+
+    btnNext.addEventListener('click', () => {
+        if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            updateView();
+        } else {
+            alert("Examen finalizado. (Simulación)");
+        }
+    });
+
+    btnPrev.addEventListener('click', () => {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            updateView();
+        }
+    });
+</script>
+
+</body>
+</html>

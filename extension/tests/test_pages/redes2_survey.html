@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación Práctica - Redes de Computadores II</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; background: #eef2f5; color: #333; }
+        .header-title { border-bottom: 3px solid #2c3e50; padding-bottom: 10px; margin-bottom: 30px; }
+        .question-card { background: white; padding: 25px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        label { font-weight: 600; display: block; margin-bottom: 12px; font-size: 15px; color: #2c3e50; }
+        .hint { font-size: 12px; color: #666; font-weight: normal; margin-top: -8px; margin-bottom: 12px; display: block; font-style: italic; }
+        textarea, select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: inherit; }
+        textarea:focus, select:focus { border-color: #3498db; outline: none; }
+        .options { display: flex; flex-direction: column; gap: 8px; }
+        .options label { font-weight: normal; display: flex; align-items: center; cursor: pointer; margin-bottom: 0; }
+        .options input { margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="header-title">
+        <h2>Laboratorio 4: Topologías Avanzadas y pfSense</h2>
+        <p>Cuestionario de evaluación continua. Responda según su experiencia en el laboratorio.</p>
+    </div>
+
+    <div class="question-card">
+        <label for="q_vlan">1. Define el propósito principal de una VLAN.</label>
+        <span class="hint">Responde de forma muy concisa, máximo en 15 palabras.</span>
+        <textarea id="q_vlan" rows="2"></textarea>
+    </div>
+
+    <div class="question-card">
+        <label for="q_ha">2. Arquitectura de Alta Disponibilidad</label>
+        <span class="hint">Explica en detalle (al menos 3 párrafos) cómo configurarías un protocolo de alta disponibilidad usando pfSense y GNS3.</span>
+        <textarea id="q_ha" rows="6"></textarea>
+    </div>
+
+    <div class="question-card">
+        <label>3. ¿Qué protocolo utilizas en tus laboratorios para la asignación dinámica de direcciones IP?</label>
+        <div class="options">
+            <label><input type="radio" name="ip_protocol" id="ip_dhcp" value="DHCP"> DHCP</label>
+            <label><input type="radio" name="ip_protocol" id="ip_arp" value="ARP"> ARP</label>
+            <label><input type="radio" name="ip_protocol" id="ip_dns" value="DNS"> DNS</label>
+            <label><input type="radio" name="ip_protocol" id="ip_icmp" value="ICMP"> ICMP</label>
+        </div>
+    </div>
+
+    <div class="question-card">
+        <label>4. Selecciona las herramientas que has utilizado para simular y emular la infraestructura de red:</label>
+        <div class="options">
+            <label><input type="checkbox" name="tools" id="t_gns3" value="GNS3"> GNS3</label>
+            <label><input type="checkbox" name="tools" id="t_cisco" value="Cisco IOS"> Cisco IOS (Imágenes)</label>
+            <label><input type="checkbox" name="tools" id="t_packet" value="Packet Tracer"> Packet Tracer</label>
+            <label><input type="checkbox" name="tools" id="t_vmware" value="VMware"> VMware Workstation</label>
+        </div>
+    </div>
+
+    <div class="question-card">
+        <label for="switch_port">5. Modo de puerto para conectar dos switches administrables (Trunking):</label>
+        <select id="switch_port">
+            <option value="" disabled selected>Selecciona un modo...</option>
+            <option value="access">Access Mode</option>
+            <option value="trunk">Trunk Mode</option>
+            <option value="dynamic_auto">Dynamic Auto</option>
+            <option value="dynamic_desirable">Dynamic Desirable</option>
+        </select>
+    </div>
+
+</body>
+</html>

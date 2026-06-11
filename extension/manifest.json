@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Survey Copilot",
+  "version": "0.1.0",
+  "description": "Asistente local invisible para auto-completar encuestas usando IA.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["content.css"],
+      "js": ["modules/detector.js", "modules/filler.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
