@@ -21,7 +21,7 @@
     {
       "matches": ["<all_urls>"],
       "css": ["content.css"],
-      "js": ["modules/detector.js", "modules/filler.js", "content.js"],
+      "js": ["modules/text_sanitizer.js", "modules/detector.js", "modules/filler.js", "content.js"],
       "run_at": "document_idle"
     }
   ]

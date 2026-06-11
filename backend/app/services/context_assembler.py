@@ -7,18 +7,38 @@ class ContextAssembler:
     """Organiza los fragmentos recuperados en un contexto coherente para el LLM."""
     
     MAX_CONTEXT_CHARS = 3000  # Dejamos espacio para la pregunta y el system prompt
+    MIN_RELEVANCE_SCORE = 0.30  # Minimum score to include a chunk — filters cross-subject noise
     
     def assemble(self, chunks: list[RetrievedChunk], question: str) -> str | None:
         """
         Construye un string de contexto estructurado a partir de los fragmentos.
         Agrupa por sección, ordena por relevancia y añade la fuente.
+        Filtra fragmentos con score bajo para evitar contaminación de otros temas.
         """
         if not chunks:
             return None
         
+        # Filter out low-relevance chunks to prevent cross-subject contamination
+        # (e.g., networking PDFs leaking into English course answers)
+        relevant_chunks = [c for c in chunks if c.score >= self.MIN_RELEVANCE_SCORE]
+        
+        if not relevant_chunks:
+            logger.info(
+                f"All {len(chunks)} retrieved chunks scored below threshold "
+                f"({self.MIN_RELEVANCE_SCORE}). Best score: {max(c.score for c in chunks):.3f}. "
+                f"Falling back to general knowledge."
+            )
+            return None
+        
+        if len(relevant_chunks) < len(chunks):
+            logger.info(
+                f"Filtered {len(chunks) - len(relevant_chunks)} low-relevance chunks "
+                f"(below {self.MIN_RELEVANCE_SCORE}). Kept {len(relevant_chunks)}."
+            )
+        
         # Agrupar fragmentos por el título de la sección
         sections: dict[str, list[RetrievedChunk]] = {}
-        for chunk in chunks:
+        for chunk in relevant_chunks:
             heading = chunk.metadata.get("section_heading", "General")
             sections.setdefault(heading, []).append(chunk)
         

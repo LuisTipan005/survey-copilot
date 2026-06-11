@@ -2,12 +2,12 @@ import time
 import logging
 import json
 import re  # <--- AÑADE ESTA LÍNEA AQUÍ ARRIBA
-import difflib
 from app.models import SurveyAnalyzeRequest, SurveyAnalyzeResponse, GeneratedAnswer, QuestionType
 from app.services.ollama_service import ollama_service
 from app.services.rag_service import rag_service
 from app.services.context_assembler import context_assembler
 from app.services.prompt_engine import prompt_engine
+from app.services.answer_matcher import answer_matcher
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,89 @@ class SurveyAnalyzer:
             return "technical"
             
         return None
+
+    # ─── JSON Extraction & Repair ────────────────────────────────
+
+    @staticmethod
+    def _extract_json_block(raw_text: str) -> str | None:
+        """
+        Bracket-balanced JSON extraction.
+        
+        Finds the first '{' and tracks nesting depth to find the matching '}'.
+        This is much more reliable than greedy regex when the LLM adds
+        conversational text or multiple JSON-like fragments.
+        """
+        if not raw_text:
+            return None
+        
+        start = raw_text.find('{')
+        if start == -1:
+            return None
+        
+        depth = 0
+        in_string = False
+        escape_next = False
+        
+        for i in range(start, len(raw_text)):
+            char = raw_text[i]
+            
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                continue
+            
+            if char == '"':
+                in_string = not in_string
+                continue
+            
+            if in_string:
+                continue
+            
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    return raw_text[start:i + 1]
+        
+        # Unbalanced — try to salvage by appending closing braces
+        if depth > 0:
+            return raw_text[start:] + ('}' * depth)
+        
+        return None
+
+    @staticmethod
+    def _repair_json(json_str: str) -> str:
+        """
+        Fix common LLM JSON errors before json.loads:
+        1. Single quotes → double quotes (outside of already-double-quoted strings)
+        2. Trailing commas before } or ]
+        3. Unquoted string values after colons
+        4. Remove markdown code fence markers
+        """
+        if not json_str:
+            return json_str
+        
+        # Remove markdown code fences: ```json ... ``` or ``` ... ```
+        json_str = re.sub(r'```(?:json)?\s*', '', json_str)
+        
+        # Replace single quotes with double quotes (naive but effective for LLM output)
+        # Only do this if there are no double quotes (to avoid corrupting valid JSON)
+        if '"' not in json_str and "'" in json_str:
+            json_str = json_str.replace("'", '"')
+        
+        # Remove trailing commas: ,} or ,]
+        json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+        
+        # Remove any BOM or zero-width chars
+        json_str = json_str.replace('\ufeff', '').replace('\u200b', '')
+        
+        return json_str.strip()
+
+    # ─── Main Analysis Pipeline ──────────────────────────────────
 
     async def analyze(self, request: SurveyAnalyzeRequest) -> SurveyAnalyzeResponse:
         start_time = time.time()
@@ -80,41 +163,68 @@ class SurveyAnalyzer:
                 if payload["format_json"]:
                     response_raw = await ollama_service.generate_response(
                         prompt=payload["prompt"],
-                        system_prompt=payload["system_prompt"]
+                        system_prompt=payload["system_prompt"],
+                        format_json=True  # <--- WIRED THROUGH: enables Ollama's JSON grammar constraint
                     )
                     
-                    # --- EXTRACCIÓN AGRESIVA DE JSON (REGEX) ---
-                    # Busca el primer bloque que empiece con { y termine con } sin importar qué haya antes o después
-                    json_match = re.search(r'\{[\s\S]*\}', response_raw)
+                    # Guard against None response (Ollama connection error)
+                    if response_raw is None:
+                        logger.error("Ollama returned None — connection failed or timeout.")
+                        raise ValueError("Ollama no respondió (None).")
                     
-                    if not json_match:
+                    logger.info(f"[DIAG] LLM raw response ({len(response_raw)} chars): {response_raw[:300]}")
+                    
+                    # --- BRACKET-BALANCED JSON EXTRACTION + REPAIR ---
+                    json_block = self._extract_json_block(response_raw)
+                    
+                    if not json_block:
                         logger.error(f"LLM no devolvió JSON. Raw: {response_raw}")
                         raise ValueError("El modelo no generó un JSON válido.")
-                        
-                    clean_json = json_match.group(0)
-                    data = json.loads(clean_json)
-                    # -------------------------------------------
+                    
+                    # Attempt parse, repair on failure
+                    data = None
+                    try:
+                        data = json.loads(json_block)
+                    except json.JSONDecodeError:
+                        logger.warning("JSON parse failed, attempting repair...")
+                        repaired = self._repair_json(json_block)
+                        try:
+                            data = json.loads(repaired)
+                            logger.info("JSON repair succeeded.")
+                        except json.JSONDecodeError as e2:
+                            logger.error(f"JSON repair also failed: {e2}. Repaired text: {repaired}")
+                            raise ValueError(f"JSON irrecuperable: {e2}")
+                    
+                    logger.info(f"[DIAG] Parsed JSON keys: {list(data.keys())}")
                     
                     raw_selected = data.get("selected", [])
                     reasoning = data.get("reasoning", "Opción determinada por el motor de inferencia.")
                     
-                    raw_selected = data.get("selected", [])
-                    reasoning = data.get("reasoning", "Opción determinada por el motor de inferencia.")
+                    logger.info(f"[DIAG] raw_selected = {raw_selected}")
+                    logger.info(f"[DIAG] question.options = {question.options}")
                     
                     selected_options = []
                     
-                    # NUEVA ESTRATEGIA: Mapeo de texto a índice usando difflib
+                    # STRATEGY: Map LLM text answers to indices using the 3-tier matcher
                     if isinstance(raw_selected, list) and len(raw_selected) > 0 and isinstance(raw_selected[0], str):
-                        for text_ans in raw_selected:
-                            # Comparamos el texto devuelto por Qwen con las opciones originales (precisión del 30% como mínimo)
-                            matches = difflib.get_close_matches(text_ans, question.options, n=1, cutoff=0.3)
-                            if matches:
-                                idx = question.options.index(matches[0])
-                                selected_options.append(idx)
+                        logger.info(f"[DIAG] Using text matcher: {len(raw_selected)} items to match against {len(question.options) if question.options else 0} options")
+                        selected_options = answer_matcher.match_many(raw_selected, question.options)
                     
-                    # Fallback de seguridad por si de todos modos devuelve un entero
+                    # Fallback: if the LLM returned integer indices directly
                     elif isinstance(raw_selected, list):
+                        logger.info(f"[DIAG] Using integer fallback for raw_selected: {raw_selected}")
                         selected_options = [int(x) for x in raw_selected if str(x).isdigit() or isinstance(x, int)]
+                    
+                    logger.info(f"[DIAG] Final selected_options = {selected_options}")
+                    
+                    # Safety: warn if nothing matched
+                    if not selected_options:
+                        logger.warning(
+                            f"No options matched for question: '{question.question_text[:60]}...'. "
+                            f"LLM returned: {raw_selected}. "
+                            f"Available options: {question.options}"
+                        )
+
                 else:
                     # Respuesta fluida de texto para áreas extensas o cortas
                     answer_text = await ollama_service.generate_response(

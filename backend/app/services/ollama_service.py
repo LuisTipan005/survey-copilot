@@ -1,4 +1,5 @@
 import logging
+import random
 import httpx
 from typing import Optional, Dict, Any
 from app.config import settings
@@ -78,8 +79,11 @@ class OllamaService:
                 {"role": "user", "content": prompt}
             ],
             "stream": False,  # Disabled for MVP; can be enabled in Phase 4
+            "keep_alive": 0,  # Force Ollama to discard KV cache after each request
             "options": {
-                "temperature": temperature if temperature is not None else settings.DEFAULT_TEMPERATURE
+                "temperature": temperature if temperature is not None else settings.DEFAULT_TEMPERATURE,
+                "seed": random.randint(1, 2**31 - 1),  # Random seed to avoid deterministic repetition
+                "num_ctx": 4096,  # Explicit context window to prevent implicit reuse
             }
         }
 
