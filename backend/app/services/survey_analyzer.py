@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 import json
@@ -180,6 +181,12 @@ class SurveyAnalyzer:
     async def analyze(self, request: SurveyAnalyzeRequest) -> SurveyAnalyzeResponse:
         start_time = time.time()
         generated_answers = []
+        
+        # Check for Context: scan data/documents/ folder
+        UPLOAD_DIR = "data/documents"
+        has_pdfs = False
+        if os.path.exists(UPLOAD_DIR) and any(f.endswith(".pdf") for f in os.listdir(UPLOAD_DIR)):
+            has_pdfs = True
 
         for question in request.questions:
             logger.info(f"Procesando pregunta con RAG Profundo: {question.question_text}")
@@ -187,21 +194,28 @@ class SurveyAnalyzer:
             # 1. Clasificación heurística del contexto de la pregunta
             doc_type_filter = self._determine_doc_type_filter(question.question_text, question.question_type)
             
-            # 2. Pipeline de Recuperación Híbrida (Vectores + Keywords)
-            chunks = await rag_service.query_hybrid(
-                question=question.question_text,
-                n_results=4,
-                doc_type_filter=doc_type_filter
-            )
-            
-            # 3. Ensamblado Estructurado del Contexto (Límite estricto de caracteres)
-            rag_context = context_assembler.assemble(chunks, question.question_text)
-            context_used = rag_context is not None
-            
-            # Extraer las fuentes únicas en formato de lista para el payload de respuesta
+            chunks = []
+            rag_context = None
+            context_used = False
             context_sources = []
-            if chunks:
-                context_sources = list(set([c.metadata.get("filename", "Desconocido") for c in chunks]))
+            
+            if has_pdfs:
+                # 2. Pipeline de Recuperación Híbrida (Vectores + Keywords)
+                chunks = await rag_service.query_hybrid(
+                    question=question.question_text,
+                    n_results=4,
+                    doc_type_filter=doc_type_filter
+                )
+                
+                # 3. Ensamblado Estructurado del Contexto (Límite estricto de caracteres)
+                rag_context = context_assembler.assemble(chunks, question.question_text)
+                context_used = rag_context is not None
+                
+                # Extraer las fuentes únicas en formato de lista para el payload de respuesta
+                if chunks:
+                    context_sources = list(set([c.metadata.get("filename", "Desconocido") for c in chunks]))
+            else:
+                logger.info("Directorio de documentos vacío o sin PDFs. Omitiendo RAG (Bypass).")
 
             # 4. Construcción del Grounded Prompt
             payload = prompt_engine.build_payload(

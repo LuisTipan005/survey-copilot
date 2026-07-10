@@ -28,6 +28,21 @@ async function handleSurveyAnalysis(payload) {
         }
 
         const data = await response.json();
+        
+        // --- SAVE HISTORY TO CHROME STORAGE ---
+        chrome.storage.local.get({ quizHistory: [] }, (res) => {
+            const history = res.quizHistory;
+            history.unshift({
+                timestamp: new Date().toISOString(),
+                questionsAnalyzed: payload.questions ? payload.questions.length : 0,
+                modelUsed: data.model_used || "Unknown",
+                processingTime: data.processing_time_ms || 0
+            });
+            // Keep only the last 50 history items
+            if (history.length > 50) history.pop();
+            chrome.storage.local.set({ quizHistory: history });
+        });
+
         return data;
     } catch (error) {
         console.error("Survey Copilot - Error de conexión con el backend:", error);

@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profileInput = document.getElementById('userProfile');
     const saveBtn = document.getElementById('saveProfileBtn');
     const scanBtn = document.getElementById('scanBtn');
+    const openDashboardBtn = document.getElementById('openDashboardBtn');
     const statusDot = document.getElementById('backendStatus');
     const statusText = document.getElementById('statusText');
     const saveFeedback = document.getElementById('saveFeedback');
@@ -36,8 +37,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => { saveFeedback.textContent = ''; }, 2000);
         });
     });
+    // 4. Open Settings Dashboard
+    if (openDashboardBtn) {
+        openDashboardBtn.addEventListener('click', () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+        });
+    }
 
-    // 4. Trigger Scan — targets Moodle quiz pop-up if one is open, otherwise the active tab
+    // 5. Trigger Scan — targets Moodle quiz pop-up if one is open, otherwise the active tab
     scanBtn.addEventListener('click', async () => {
         actionStatus.textContent = 'Buscando ventana del quiz...';
         actionStatus.style.color = '';

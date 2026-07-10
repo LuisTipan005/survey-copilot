@@ -145,6 +145,19 @@ class RagService:
             logger.error(f"Error ingestando documento: {e}")
             return False
 
+    async def delete_document(self, filename: str) -> bool:
+        """Elimina un documento físico y sus vectores en ChromaDB."""
+        try:
+            logger.info(f"Eliminando documento de ChromaDB: {filename}")
+            # The filename in metadata is stored as just the base filename, but the physical file has a doc_id prepended.
+            # We will delete by filename metadata
+            self._collection.delete(where={"filename": filename})
+            logger.info(f"Vectores de '{filename}' eliminados.")
+            return True
+        except Exception as e:
+            logger.error(f"Error eliminando documento de ChromaDB: {e}")
+            return False
+
     async def query_hybrid(self, question: str, n_results: int = 5, doc_type_filter: str | None = None) -> list[RetrievedChunk]:
         """Hybrid retrieval: semantic + keyword + metadata filtering."""
         if self._collection.count() == 0:

@@ -1,0 +1,17 @@
+# Variables de entorno
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# VS Code
+.vscode/

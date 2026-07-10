@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Copilot - Settings</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px;
+            background-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
+                              radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--surface-color);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        .section {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .section:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            padding: 10px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        button.danger:hover {
+            background: var(--danger-hover);
+        }
+
+        /* Drag and drop zone */
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            margin-top: 16px;
+            position: relative;
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .drop-zone p {
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Document list */
+        .doc-list {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .doc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .doc-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .doc-icon {
+            color: #ef4444;
+        }
+
+        /* Toast notifications */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: var(--surface-color);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.3s ease forwards, fadeOut 0.3s ease 2.7s forwards;
+            opacity: 0;
+            transform: translateX(100%);
+        }
+
+        .toast.success { border-left: 4px solid #22c55e; }
+        .toast.error { border-left: 4px solid var(--danger); }
+
+        @keyframes slideIn {
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+
+        /* Loader */
+        .loader {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-top: 12px;
+        }
+        .flex-row > div {
+            flex: 1;
+        }
+
+        /* History section */
+        .history-list {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .history-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .history-item {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .history-details {
+            display: flex;
+            gap: 16px;
+            font-size: 0.95rem;
+        }
+
+        .history-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history-stat-val {
+            color: var(--primary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>Survey Copilot Config</h1>
+            <p>Manage your AI models and knowledge base</p>
+        </div>
+
+        <div class="section">
+            <h2>🧠 Active Model Selection</h2>
+            <div class="form-group">
+                <label for="model-select">Select your default OpenRouter LLM</label>
+                <div class="flex-row">
+                    <div>
+                        <select id="model-select">
+                            <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B Instruct</option>
+                            <option value="meta-llama/llama-3-8b-instruct">Llama 3 8B Instruct</option>
+                            <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
+                            <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+                            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                            <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                            <option value="openai/gpt-4o">GPT-4o</option>
+                        </select>
+                    </div>
+                    <button id="save-model-btn">
+                        <span class="btn-text">Save Model</span>
+                        <span class="loader" id="model-loader"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📚 Knowledge Base (PDF RAG)</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+                Upload PDFs to enhance the AI's answers. If no PDFs are indexed, the RAG phase is gracefully bypassed.
+            </p>
+            
+            <div class="drop-zone" id="drop-zone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary); margin-bottom: 12px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Drag and drop PDF files here</p>
+                <p style="font-size: 0.8rem;">or click to browse</p>
+                <input type="file" id="file-input" accept=".pdf" multiple>
+            </div>
+            
+            <div id="upload-progress" style="margin-top: 12px; font-size: 0.9rem; color: var(--primary); display: none;">
+                Uploading and indexing... Please wait <span class="loader" style="display: inline-block; vertical-align: middle; border-color: rgba(59, 130, 246, 0.3); border-top-color: var(--primary); margin-left: 8px;"></span>
+            </div>
+
+            <div class="doc-list" id="doc-list">
+                <!-- Document items will be injected here -->
+                <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.9rem;" id="empty-state">
+                    No documents indexed. Using native model knowledge.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="margin: 0;">🕰️ Quiz History</h2>
+                <button id="clear-history-btn" class="danger" style="padding: 6px 12px; font-size: 0.85rem;">Clear History</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 8px;">
+                Log of past quiz evaluations parsed by the Copilot.
+            </p>
+            
+            <div class="history-list" id="history-list">
+                <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.9rem;" id="history-empty-state">
+                    No quiz history available yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
