@@ -37,23 +37,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // 4. Trigger Scan on the active tab
+    // 4. Trigger Scan — targets Moodle quiz pop-up if one is open, otherwise the active tab
     scanBtn.addEventListener('click', async () => {
-        actionStatus.textContent = 'Injecting script...';
-        
-        // Get the active tab
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        if (!tab) return;
+        actionStatus.textContent = 'Buscando ventana del quiz...';
+        actionStatus.style.color = '';
 
-        // Send message to the content script of that tab
-        chrome.tabs.sendMessage(tab.id, { action: "START_SCAN" }, (response) => {
-            if (chrome.runtime.lastError) {
-                actionStatus.textContent = 'Please reload the page first.';
-                actionStatus.style.color = '#f44336';
-            } else {
-                actionStatus.textContent = 'Scanning...';
-            }
-        });
+        // QuizWindowFinder is loaded as a module script in popup.html
+        const { tabId, wasInjected, error } = await QuizWindowFinder.resolveAndScan();
+
+        if (error) {
+            actionStatus.textContent = 'Error: ' + error;
+            actionStatus.style.color = '#f44336';
+            return;
+        }
+
+        if (wasInjected) {
+            actionStatus.textContent = 'Scripts inyectados. Escaneando...';
+        } else {
+            actionStatus.textContent = 'Escaneando...';
+        }
     });
 });

@@ -5,12 +5,13 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Survey Copilot API"
     VERSION: str = "0.1.0"
     
-    # Ollama Configuration
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen3:8b"
+    # OpenRouter Configuration
+    OPENROUTER_API_KEY: str = ""  # Required — set in .env
+    LLM_MODEL: str = "meta-llama/llama-3.1-70b-instruct"
+    APP_URL: str = "http://localhost:8000"
     
     # LLM Parameters
-    DEFAULT_TEMPERATURE: float = 0.3
+    DEFAULT_TEMPERATURE: float = 0.1
     
     class Config:
         env_file = ".env"

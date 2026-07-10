@@ -10,5 +10,5 @@ async def health_check():
         "status": "ok", 
         "project": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "ollama_model": settings.OLLAMA_MODEL
+        "llm_model": settings.LLM_MODEL
     }

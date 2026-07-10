@@ -1,9 +1,11 @@
 import time
 import logging
 import json
-import re  # <--- AÑADE ESTA LÍNEA AQUÍ ARRIBA
+import re
+import difflib
+from app.config import settings
 from app.models import SurveyAnalyzeRequest, SurveyAnalyzeResponse, GeneratedAnswer, QuestionType
-from app.services.ollama_service import ollama_service
+from app.services.llm_service import llm_service
 from app.services.rag_service import rag_service
 from app.services.context_assembler import context_assembler
 from app.services.prompt_engine import prompt_engine
@@ -118,6 +120,61 @@ class SurveyAnalyzer:
         
         return json_str.strip()
 
+    # ─── Defensive Fuzzy Fallback ─────────────────────────────────
+
+    @staticmethod
+    def _fuzzy_match_options(raw_selected: list[str], options: list[str], cutoff: float = 0.2) -> list[int]:
+        """
+        Last-resort fallback using difflib.get_close_matches with a permissive
+        cutoff threshold. Maps LLM string responses back to the actual HTML
+        element indices from the question options payload.
+        
+        Cloud models (70B+) may paraphrase more aggressively than local models,
+        so a low cutoff (0.2) ensures we still match despite heavy rephrasing.
+        
+        Args:
+            raw_selected: List of text strings returned by the LLM.
+            options: List of original option texts from the HTML form.
+            cutoff: Minimum similarity ratio (0.0–1.0). Lower = more permissive.
+            
+        Returns:
+            List of matched option indices.
+        """
+        if not raw_selected or not options:
+            return []
+        
+        # Normalize options for comparison
+        normalized_options = [opt.strip().lower() for opt in options]
+        matched_indices = []
+        
+        for llm_text in raw_selected:
+            normalized_llm = llm_text.strip().lower()
+            
+            # Use difflib.get_close_matches against the normalized option list
+            close = difflib.get_close_matches(
+                normalized_llm,
+                normalized_options,
+                n=1,
+                cutoff=cutoff,
+            )
+            
+            if close:
+                # Find the index of the matched option
+                idx = normalized_options.index(close[0])
+                if idx not in matched_indices:
+                    matched_indices.append(idx)
+                    logger.info(
+                        f"Fuzzy fallback matched '{llm_text[:60]}...' → "
+                        f"option[{idx}] (similarity with '{options[idx][:60]}...')"
+                    )
+            else:
+                logger.warning(
+                    f"Fuzzy fallback: no match for '{llm_text[:80]}...' "
+                    f"(cutoff={cutoff})"
+                )
+        
+        return matched_indices
+
     # ─── Main Analysis Pipeline ──────────────────────────────────
 
     async def analyze(self, request: SurveyAnalyzeRequest) -> SurveyAnalyzeResponse:
@@ -153,7 +210,7 @@ class SurveyAnalyzer:
                 rag_context=rag_context
             )
 
-            # 5. Pipeline de Generación con Qwen 2.5
+            # 5. Pipeline de Generación con OpenRouter
             answer_text = ""
             confidence = 0.60  # Baseline por defecto sin contexto
             reasoning = "Respuesta inferida mediante conocimiento general del modelo."
@@ -161,16 +218,16 @@ class SurveyAnalyzer:
 
             try:
                 if payload["format_json"]:
-                    response_raw = await ollama_service.generate_response(
+                    response_raw = await llm_service.generate_response(
                         prompt=payload["prompt"],
                         system_prompt=payload["system_prompt"],
-                        format_json=True  # <--- WIRED THROUGH: enables Ollama's JSON grammar constraint
+                        require_json=True,  # Enables OpenRouter's native JSON structured output
                     )
                     
-                    # Guard against None response (Ollama connection error)
+                    # Guard against None response (API connection error)
                     if response_raw is None:
-                        logger.error("Ollama returned None — connection failed or timeout.")
-                        raise ValueError("Ollama no respondió (None).")
+                        logger.error("LLM returned None — connection failed or timeout.")
+                        raise ValueError("El LLM no respondió (None).")
                     
                     logger.info(f"[DIAG] LLM raw response ({len(response_raw)} chars): {response_raw[:300]}")
                     
@@ -209,6 +266,15 @@ class SurveyAnalyzer:
                     if isinstance(raw_selected, list) and len(raw_selected) > 0 and isinstance(raw_selected[0], str):
                         logger.info(f"[DIAG] Using text matcher: {len(raw_selected)} items to match against {len(question.options) if question.options else 0} options")
                         selected_options = answer_matcher.match_many(raw_selected, question.options)
+                        
+                        # Defensive fallback: if the 3-tier matcher failed to match anything,
+                        # try a permissive difflib fuzzy match (cutoff=0.2) as a last resort.
+                        # Cloud models (70B+) may paraphrase more aggressively than local ones.
+                        if not selected_options and question.options:
+                            logger.warning("3-tier matcher returned empty — trying fuzzy fallback (cutoff=0.2)...")
+                            selected_options = self._fuzzy_match_options(
+                                raw_selected, question.options, cutoff=0.2
+                            )
                     
                     # Fallback: if the LLM returned integer indices directly
                     elif isinstance(raw_selected, list):
@@ -216,6 +282,25 @@ class SurveyAnalyzer:
                         selected_options = [int(x) for x in raw_selected if str(x).isdigit() or isinstance(x, int)]
                     
                     logger.info(f"[DIAG] Final selected_options = {selected_options}")
+                    
+                    # --- Review Mode Visual Block ---
+                    print("\n=========================")
+                    q_text_trunc = question.question_text[:80] + ("..." if len(question.question_text) > 80 else "")
+                    print(f"🧠 {q_text_trunc}")
+                    
+                    if selected_options and question.options:
+                        matched_texts = []
+                        for idx in selected_options:
+                            if 0 <= idx < len(question.options):
+                                matched_texts.append(question.options[idx])
+                        
+                        if matched_texts:
+                            print(f"✅ {' | '.join(matched_texts)}")
+                        else:
+                            print("❌ No match found (indices out of bounds)")
+                    else:
+                        print("❌ No match found for this question")
+                    print("=========================\n")
                     
                     # Safety: warn if nothing matched
                     if not selected_options:
@@ -227,7 +312,7 @@ class SurveyAnalyzer:
 
                 else:
                     # Respuesta fluida de texto para áreas extensas o cortas
-                    answer_text = await ollama_service.generate_response(
+                    answer_text = await llm_service.generate_response(
                         prompt=payload["prompt"],
                         system_prompt=payload["system_prompt"]
                     )
@@ -265,7 +350,7 @@ class SurveyAnalyzer:
 
         return SurveyAnalyzeResponse(
             answers=generated_answers,
-            model_used=prompt_engine.build_payload(request.questions[0], request.user_profile).get("model", "qwen2.5:7b"),
+            model_used=settings.LLM_MODEL,
             processing_time_ms=round(processing_time_ms, 2)
         )
 

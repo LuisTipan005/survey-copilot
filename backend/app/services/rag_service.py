@@ -6,7 +6,6 @@ from typing import List, Dict, Any, Optional
 from app.config import settings
 from app.models import DocumentSection, RetrievedChunk
 from app.utils.pdf_loader import extract_structured_pdf
-from app.services.ollama_service import ollama_service
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +101,9 @@ class RagService:
         db_path = getattr(settings, "CHROMA_DB_PATH", "./data/chroma_db")
         os.makedirs(db_path, exist_ok=True)
         self._client = chromadb.PersistentClient(path=db_path)
+        # No embedding_function specified — ChromaDB uses its built-in
+        # sentence-transformers/all-MiniLM-L6-v2 by default.
+        # The sentence-transformers package must be installed.
         self._collection = self._client.get_or_create_collection(name="survey_docs")
         self.chunker = SmartChunker()
         self.is_ready = True
@@ -114,19 +116,14 @@ class RagService:
             chunks = self.chunker.chunk_document(md_text, sections)
             
             texts = [c["text"] for c in chunks]
-            embeddings = await ollama_service.generate_embeddings(texts)
-            
-            if not embeddings:
-                logger.error("No se pudieron generar los embeddings.")
-                return False
-
             chunk_ids = [f"{doc_id}_{i}" for i in range(len(chunks))]
             
-            # Almacenar en ChromaDB con metadatos enriquecidos
+            # ChromaDB auto-embeds the documents using its default
+            # sentence-transformers embedding function.
+            # No manual embedding generation needed.
             self._collection.add(
                 ids=chunk_ids,
                 documents=texts,
-                embeddings=embeddings,
                 metadatas=[
                     {
                         "document_id": doc_id,
@@ -153,15 +150,12 @@ class RagService:
         if self._collection.count() == 0:
             return []
         
-        # 1. Búsqueda semántica (embedding similarity)
-        query_embeddings = await ollama_service.generate_embeddings([question])
-        if not query_embeddings:
-            return []
-            
         where_filter = {"doc_type": doc_type_filter} if doc_type_filter else None
         
+        # 1. Búsqueda semántica — ChromaDB auto-embeds the query text
+        # using its default sentence-transformers embedding function.
         semantic_results = self._collection.query(
-            query_embeddings=query_embeddings,
+            query_texts=[question],
             n_results=min(n_results * 2, self._collection.count()),
             where=where_filter,
             include=["documents", "metadatas", "distances"],
