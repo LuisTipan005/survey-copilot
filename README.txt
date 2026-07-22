@@ -11,12 +11,19 @@ Un "copilot invisible" basado en una extensión MV3 de Chrome y un backend de Fa
 
 ### 1. Levantar el Backend
 Navega a la carpeta `/backend`:
-\`\`\`bash
-python -m venv venv
-source venv/Scripts/activate  # (En Windows)
+```bash
+cd backend
+
+# 2. (Opcional) Activa tu entorno virtual si usas uno
+# En Windows: venv\Scripts\activate
+# En Mac/Linux: source venv/bin/activate
+
+# Instalar dependencias si es la primera vez
 pip install -r requirements.txt
-python run.py
-\`\`\`
+
+# 3. Arranca el servidor (asumiendo que corre en el puerto 8000)
+python -m app.run
+```
 El backend correrá en `http://localhost:8000`.
 
 ### 2. Instalar la Extensión de Chrome

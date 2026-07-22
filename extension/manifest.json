@@ -3,6 +3,11 @@
   "name": "Survey Copilot",
   "version": "0.1.0",
   "description": "Asistente local invisible para auto-completar encuestas usando IA.",
+  "icons": {
+    "16": "icons/survey.png",
+    "48": "icons/survey.png",
+    "128": "icons/survey.png"
+  },
   "permissions": [
     "activeTab",
     "storage",
@@ -16,8 +21,22 @@
   "background": {
     "service_worker": "background.js"
   },
+  "commands": {
+    "scan-page": {
+      "suggested_key": {
+        "default": "Alt+S",
+        "mac": "Alt+S"
+      },
+      "description": "Trigger Survey Copilot Scan"
+    }
+  },
   "action": {
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/survey.png",
+      "48": "icons/survey.png",
+      "128": "icons/survey.png"
+    }
   },
   "content_scripts": [
     {

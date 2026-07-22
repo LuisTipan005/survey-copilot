@@ -49,16 +49,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         actionStatus.textContent = 'Buscando ventana del quiz...';
         actionStatus.style.color = '';
 
-        // QuizWindowFinder is loaded as a module script in popup.html
-        const { tabId, wasInjected, error } = await QuizWindowFinder.resolveAndScan();
+        // Delegate scanning to the centralized background script
+        const result = await new Promise(resolve => {
+            chrome.runtime.sendMessage({ action: "TRIGGER_SCAN" }, resolve);
+        });
 
-        if (error) {
-            actionStatus.textContent = 'Error: ' + error;
+        if (!result || !result.success) {
+            const errorMsg = result?.error || "Desconocido";
+            actionStatus.textContent = 'Error: ' + errorMsg;
             actionStatus.style.color = '#f44336';
             return;
         }
 
-        if (wasInjected) {
+        if (result.wasInjected) {
             actionStatus.textContent = 'Scripts inyectados. Escaneando...';
         } else {
             actionStatus.textContent = 'Escaneando...';

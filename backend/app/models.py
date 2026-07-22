@@ -9,13 +9,19 @@ class QuestionType(str, Enum):
     MULTIPLE_CHOICE = "multi"
     SCALE = "scale"
     DROPDOWN = "dropdown"
+    CLOZE = "cloze"   # Multi-gap fill-in-the-blank
 
 class DetectedQuestion(BaseModel):
     element_id: Optional[str] = None
+    element_ids: Optional[List[str]] = None   # Used for cloze gaps & radio groups
     question_text: str
     question_type: QuestionType
     options: Optional[List[str]] = None
     context: Optional[str] = None
+    gap_count: Optional[int] = None           # Number of [GAP n] placeholders (cloze only)
+    # Multimodal Vision: a Base64 data URL or absolute URL of an image
+    # embedded in the question (e.g. "Analyze the following diagram").
+    image_base64: Optional[str] = None
 
 class GeneratedAnswer(BaseModel):
     question_text: str

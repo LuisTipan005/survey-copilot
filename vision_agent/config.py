@@ -15,7 +15,7 @@ class VisionSettings(BaseSettings):
 
     # ─── OpenRouter LLM Configuration ────────────────────────────
     OPENROUTER_API_KEY: str = ""
-    LLM_MODEL: str = "openai/gpt-5"
+    LLM_MODEL: str = "openai/gpt-4o-mini"
     APP_URL: str = "http://localhost:8000"
     PROJECT_NAME: str = "Survey Copilot Vision Agent"
 
@@ -24,8 +24,7 @@ class VisionSettings(BaseSettings):
 
     # ─── Monitor Selection ───────────────────────────────────────
     # mss monitor index: 0 = virtual combined screen, 1 = primary, 2+ = secondary
-    # "active" = Auto-detect monitor containing the mouse cursor
-    MONITOR_INDEX: str | int = "active"
+    MONITOR_INDEX: int = 1
 
     # ─── OpenCV Element Detection Thresholds ─────────────────────
     # Contour detection

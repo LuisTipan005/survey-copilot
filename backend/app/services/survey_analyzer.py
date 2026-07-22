@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 import logging
@@ -236,6 +237,7 @@ class SurveyAnalyzer:
                         prompt=payload["prompt"],
                         system_prompt=payload["system_prompt"],
                         require_json=True,  # Enables OpenRouter's native JSON structured output
+                        image_base64=question.image_base64,  # None when no image present
                     )
                     
                     # Guard against None response (API connection error)
@@ -276,8 +278,19 @@ class SurveyAnalyzer:
                     
                     selected_options = []
                     
+                    # ── CLOZE: answers are raw gap values, not option indices ──
+                    # The LLM returns [{\"selected\": [\"ans1\", \"ans2\", ...]}] where
+                    # each element maps positionally to [GAP 1], [GAP 2], etc.
+                    # We store them directly; filler.js will index into this array.
+                    if question.question_type == QuestionType.CLOZE:
+                        if isinstance(raw_selected, list):
+                            selected_options = list(raw_selected)  # keep as strings
+                            logger.info(f"[DIAG] CLOZE gap answers: {selected_options}")
+                        else:
+                            logger.warning("CLOZE question: 'selected' was not a list — skipping.")
+                    
                     # STRATEGY: Map LLM text answers to indices using the 3-tier matcher
-                    if isinstance(raw_selected, list) and len(raw_selected) > 0 and isinstance(raw_selected[0], str):
+                    elif isinstance(raw_selected, list) and len(raw_selected) > 0 and isinstance(raw_selected[0], str):
                         logger.info(f"[DIAG] Using text matcher: {len(raw_selected)} items to match against {len(question.options) if question.options else 0} options")
                         selected_options = answer_matcher.match_many(raw_selected, question.options)
                         
@@ -328,7 +341,8 @@ class SurveyAnalyzer:
                     # Respuesta fluida de texto para áreas extensas o cortas
                     answer_text = await llm_service.generate_response(
                         prompt=payload["prompt"],
-                        system_prompt=payload["system_prompt"]
+                        system_prompt=payload["system_prompt"],
+                        image_base64=question.image_base64,  # None when no image present
                     )
                     reasoning = "Texto redactado utilizando la base de conocimientos provista." if context_used else "Redactado bajo aproximación analítica general."
 
@@ -367,6 +381,183 @@ class SurveyAnalyzer:
             model_used=settings.LLM_MODEL,
             processing_time_ms=round(processing_time_ms, 2)
         )
+
+    # ─── Single-question helper (shared by both modes) ────────────────────────
+
+    async def analyze_single(
+        self,
+        question,
+        user_profile: str | None,
+        survey_context: str | None,
+        has_pdfs: bool,
+    ) -> GeneratedAnswer:
+        """
+        Process one DetectedQuestion through the full RAG + LLM pipeline and
+        return a GeneratedAnswer.  Extracted from analyze() so it can be called
+        concurrently by analyze_batch().
+        """
+        logger.info(f"analyze_single: '{question.question_text[:60]}'")
+
+        doc_type_filter = self._determine_doc_type_filter(question.question_text, question.question_type)
+
+        chunks        = []
+        rag_context   = None
+        context_used  = False
+        context_sources = []
+
+        if has_pdfs:
+            chunks = await rag_service.query_hybrid(
+                question=question.question_text,
+                n_results=4,
+                doc_type_filter=doc_type_filter,
+            )
+            rag_context  = context_assembler.assemble(chunks, question.question_text)
+            context_used = rag_context is not None
+            if chunks:
+                context_sources = list(set(
+                    c.metadata.get("filename", "Desconocido") for c in chunks
+                ))
+        else:
+            logger.info("analyze_single: no PDFs — skipping RAG.")
+
+        payload = prompt_engine.build_payload(
+            question=question,
+            user_profile=user_profile,
+            rag_context=rag_context,
+        )
+
+        answer_text     = ""
+        confidence      = 0.60
+        reasoning       = "Respuesta inferida mediante conocimiento general del modelo."
+        selected_options = None
+
+        try:
+            if payload["format_json"]:
+                response_raw = await llm_service.generate_response(
+                    prompt=payload["prompt"],
+                    system_prompt=payload["system_prompt"],
+                    require_json=True,
+                    image_base64=question.image_base64,
+                )
+
+                if response_raw is None:
+                    raise ValueError("El LLM no respondió (None).")
+
+                logger.info(f"[DIAG] LLM raw ({len(response_raw)} chars): {response_raw[:200]}")
+
+                json_block = self._extract_json_block(response_raw)
+                if not json_block:
+                    raise ValueError("El modelo no generó un JSON válido.")
+
+                data = None
+                try:
+                    data = json.loads(json_block)
+                except json.JSONDecodeError:
+                    repaired = self._repair_json(json_block)
+                    data = json.loads(repaired)
+
+                raw_selected = data.get("selected", [])
+                reasoning    = data.get("reasoning", "Opción determinada por el motor de inferencia.")
+
+                selected_options = []
+
+                if question.question_type == QuestionType.CLOZE:
+                    if isinstance(raw_selected, list):
+                        selected_options = list(raw_selected)
+                    else:
+                        logger.warning("CLOZE: 'selected' was not a list.")
+
+                elif isinstance(raw_selected, list) and raw_selected and isinstance(raw_selected[0], str):
+                    selected_options = answer_matcher.match_many(raw_selected, question.options)
+                    if not selected_options and question.options:
+                        selected_options = self._fuzzy_match_options(raw_selected, question.options, cutoff=0.2)
+
+                elif isinstance(raw_selected, list):
+                    selected_options = [
+                        int(x) for x in raw_selected
+                        if str(x).isdigit() or isinstance(x, int)
+                    ]
+
+                logger.info(f"[DIAG] selected_options = {selected_options}")
+
+                if not selected_options:
+                    logger.warning(f"No match for '{question.question_text[:60]}...'")
+
+            else:
+                answer_text = await llm_service.generate_response(
+                    prompt=payload["prompt"],
+                    system_prompt=payload["system_prompt"],
+                    image_base64=question.image_base64,
+                )
+                reasoning = (
+                    "Texto redactado utilizando la base de conocimientos provista."
+                    if context_used else
+                    "Redactado bajo aproximación analítica general."
+                )
+
+            # Confidence calibration
+            if context_used and chunks:
+                top_score = chunks[0].score
+                confidence = min(0.95 + top_score * 0.05, 1.0) if top_score > 0.65 else 0.85
+            else:
+                confidence = 0.60
+
+        except Exception as e:
+            logger.error(f"analyze_single pipeline error: {e}")
+            answer_text = "Omitido automáticamente para evitar respuestas erróneas."
+            confidence  = 0.0
+
+        return GeneratedAnswer(
+            question_text=question.question_text,
+            answer=answer_text,
+            confidence=round(confidence, 2),
+            reasoning=reasoning,
+            selected_options=selected_options,
+            context_used=context_used,
+            context_sources=context_sources if context_used else None,
+        )
+
+    # ─── Batch mode: Semaphore(3) parallel execution ──────────────────────────
+
+    async def analyze_batch(
+        self,
+        request: SurveyAnalyzeRequest,
+    ):
+        """
+        Async generator that processes all questions in parallel, throttled by
+        asyncio.Semaphore(3) to respect OpenRouter rate limits.
+
+        Yields one JSON-serialisable dict (a GeneratedAnswer) as each question
+        completes, enabling the FastAPI endpoint to stream NDJSON to the client.
+        This powers the real-time progress bar in the extension.
+        """
+        BATCH_CONCURRENCY = 3
+        semaphore = asyncio.Semaphore(BATCH_CONCURRENCY)
+
+        UPLOAD_DIR = "data/documents"
+        has_pdfs   = (
+            os.path.exists(UPLOAD_DIR)
+            and any(f.endswith(".pdf") for f in os.listdir(UPLOAD_DIR))
+        )
+
+        async def _guarded(question):
+            async with semaphore:
+                return await self.analyze_single(
+                    question=question,
+                    user_profile=request.user_profile,
+                    survey_context=None,  # context comes from the LLM prompt
+                    has_pdfs=has_pdfs,
+                )
+
+        # Launch all tasks concurrently — semaphore limits active workers to 3
+        tasks = [asyncio.create_task(_guarded(q)) for q in request.questions]
+
+        # Yield each answer as soon as it completes (order not guaranteed, but
+        # content.js matches answers to questions by question_text, not position)
+        for coro in asyncio.as_completed(tasks):
+            answer: GeneratedAnswer = await coro
+            yield answer
+
 
 # Exportar singleton de la clase orquestadora
 survey_analyzer = SurveyAnalyzer()

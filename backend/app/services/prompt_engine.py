@@ -36,6 +36,22 @@ class PromptEngine:
             "   - No greetings. Do not restate the question.\n"
             "   - Output: the answer directly (e.g., 'FTP Protocol', '192.168.1.1').\n\n"
 
+            "5. VISUAL ANALYSIS (image is attached alongside this message)\n"
+            "   - An image has been included as part of this question.\n"
+            "   - Study the image carefully before answering (diagrams, charts, screenshots, etc.).\n"
+            "   - Combine what you observe in the image with the written question text.\n"
+            "   - If the question has options, evaluate each option against the visual evidence.\n"
+            "   - Output follows the same rules as the corresponding question type above.\n\n"
+
+            "6. MULTI-GAP FILL-IN-THE-BLANK (Cloze)\n"
+            "   - The question text contains numbered placeholders: [GAP 1], [GAP 2], etc.\n"
+            "   - Each placeholder represents a MISSING word, number, or short phrase.\n"
+            "   - Calculate the exact answer for EACH gap in strict sequential order.\n"
+            "   - Typical use-cases: chemical equations, mathematical expressions, ordered sequences.\n"
+            "   - Output: a JSON array in the 'selected' field, one string per gap, in order.\n"
+            "   - Example: if there are 3 gaps → {\"selected\": [\"2\", \"H₂O\", \"1\"]}.\n"
+            "   - The array length MUST equal the total number of [GAP n] markers.\n\n"
+
             "══ IRONCLAD JSON OUTPUT RULE ══\n"
             "Your output MUST always be a valid JSON object: {\"selected\": [\"answer\"]}.\n"
             "NEVER return numeric indices unless the original option text IS literally a number.\n"
@@ -101,6 +117,12 @@ class PromptEngine:
         prompt = ""
         format_json = False
 
+        # --- VISUAL HINT: Prepend a notice when the question carries an image ---
+        image_notice = (
+            "[IMAGE ATTACHED] This question includes an image. "
+            "Analyze it carefully as part of your answer.\n\n"
+        ) if question.image_base64 else ""
+
         # --- MANDATORY SELECTION RULE (appended to all choice prompts) ---
         mandatory_rule = (
             "\n\nMANDATORY: The 'selected' list must contain at least one option. "
@@ -109,6 +131,7 @@ class PromptEngine:
 
         if question.question_type == QuestionType.TEXT:
             prompt = (
+                f"{image_notice}"
                 f"{context_block}"
                 f"Question: {question.question_text}\n"
                 f"Context from survey (if any): {question.context or 'None'}\n\n"
@@ -125,6 +148,7 @@ class PromptEngine:
         elif question.question_type == QuestionType.SINGLE_CHOICE:
             options_text = self._format_options(question.options)
             prompt = (
+                f"{image_notice}"
                 f"{context_block}"
                 f"Question: {question.question_text}\n"
                 f"Options:\n{options_text}\n\n"
@@ -166,6 +190,7 @@ class PromptEngine:
                 matching_guidance = ""
 
             prompt = (
+                f"{image_notice}"
                 f"{context_block}"
                 f"Question: {question_text}\n"
                 f"Options:\n{options_text}\n"
@@ -189,6 +214,7 @@ class PromptEngine:
         elif question.question_type == QuestionType.MULTIPLE_CHOICE:
             options_text = self._format_options(question.options)
             prompt = (
+                f"{image_notice}"
                 f"{context_block}"
                 f"Question: {question.question_text}\n"
                 f"Options:\n{options_text}\n\n"
@@ -202,6 +228,30 @@ class PromptEngine:
                 '{"selected": ["Option 1 summary"], "reasoning": "..."} — WRONG: summarized instead of copying\n'
                 '{"selected": [], "reasoning": "..."} — WRONG: empty list is NEVER allowed'
                 f"{mandatory_rule}"
+            )
+            format_json = True
+
+        elif question.question_type == QuestionType.CLOZE:
+            gap_count = question.gap_count or question.question_text.count('[GAP ')
+            prompt = (
+                f"{image_notice}"
+                f"{context_block}"
+                f"Question (with gaps marked as [GAP 1], [GAP 2], …):\n"
+                f"{question.question_text}\n\n"
+                f"Task: Fill in EVERY gap, in order, {behavior}.\n"
+                f"There are {gap_count} gap(s) to fill.\n\n"
+                "CRITICAL RULES:\n"
+                "1. Return ONLY a valid JSON object — no markdown, no prose.\n"
+                "2. The 'selected' field must be an ARRAY with exactly one string per gap, "
+                "listed in the same order as the [GAP n] placeholders.\n"
+                "3. Each value must be the shortest exact answer (a number, chemical symbol, "
+                "word, or brief phrase). Do NOT use full sentences.\n"
+                f"4. The array must have exactly {gap_count} element(s).\n\n"
+                "CORRECT example (3 gaps): "
+                '{"selected": ["2", "H₂O", "1"], "reasoning": "Brief justification"}\n'
+                "WRONG examples:\n"
+                '{"selected": ["2 H₂O 1"], "reasoning": "..."} — WRONG: all answers in one element\n'
+                '{"selected": [], "reasoning": "..."} — WRONG: empty array is never valid'
             )
             format_json = True
 

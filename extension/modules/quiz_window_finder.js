@@ -159,5 +159,5 @@ const QuizWindowFinder = (() => {
     return { findQuizTab, injectScriptsIntoTab, resolveAndScan, isMoodleQuizUrl };
 })();
 
-// Make available to popup.js (both run in the extension context)
-window.QuizWindowFinder = QuizWindowFinder;
+// Make available to popup.js and background.js (both run in the extension context)
+globalThis.QuizWindowFinder = QuizWindowFinder;
