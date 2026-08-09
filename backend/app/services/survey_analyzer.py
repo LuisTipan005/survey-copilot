@@ -282,12 +282,14 @@ class SurveyAnalyzer:
                     # The LLM returns [{\"selected\": [\"ans1\", \"ans2\", ...]}] where
                     # each element maps positionally to [GAP 1], [GAP 2], etc.
                     # We store them directly; filler.js will index into this array.
-                    if question.question_type == QuestionType.CLOZE:
-                        if isinstance(raw_selected, list):
+                    if question.question_type in (QuestionType.CLOZE, QuestionType.TEXT):
+                        if isinstance(raw_selected, list) and len(raw_selected) > 0:
                             selected_options = list(raw_selected)  # keep as strings
-                            logger.info(f"[DIAG] CLOZE gap answers: {selected_options}")
+                            if question.question_type == QuestionType.TEXT:
+                                answer_text = str(raw_selected[0])
+                            logger.info(f"[DIAG] {question.question_type.name} answers: {selected_options}")
                         else:
-                            logger.warning("CLOZE question: 'selected' was not a list — skipping.")
+                            logger.warning(f"{question.question_type.name} question: 'selected' was not a list — skipping.")
                     
                     # STRATEGY: Map LLM text answers to indices using the 3-tier matcher
                     elif isinstance(raw_selected, list) and len(raw_selected) > 0 and isinstance(raw_selected[0], str):
@@ -404,39 +406,38 @@ class SurveyAnalyzer:
         rag_context   = None
         context_used  = False
         context_sources = []
-
-        if has_pdfs:
-            chunks = await rag_service.query_hybrid(
-                question=question.question_text,
-                n_results=4,
-                doc_type_filter=doc_type_filter,
-            )
-            rag_context  = context_assembler.assemble(chunks, question.question_text)
-            context_used = rag_context is not None
-            if chunks:
-                context_sources = list(set(
-                    c.metadata.get("filename", "Desconocido") for c in chunks
-                ))
-        else:
-            logger.info("analyze_single: no PDFs — skipping RAG.")
-
-        payload = prompt_engine.build_payload(
-            question=question,
-            user_profile=user_profile,
-            rag_context=rag_context,
-        )
-
         answer_text     = ""
         confidence      = 0.60
         reasoning       = "Respuesta inferida mediante conocimiento general del modelo."
         selected_options = None
 
         try:
+            if has_pdfs:
+                chunks = await rag_service.query_hybrid(
+                    question=question.question_text,
+                    n_results=4,
+                    doc_type_filter=doc_type_filter,
+                )
+                rag_context  = context_assembler.assemble(chunks, question.question_text)
+                context_used = rag_context is not None
+                if chunks:
+                    context_sources = list(set(
+                        c.metadata.get("filename", "Desconocido") for c in chunks
+                    ))
+            else:
+                logger.info("analyze_single: no PDFs — skipping RAG.")
+
+            payload = prompt_engine.build_payload(
+                question=question,
+                user_profile=user_profile,
+                rag_context=rag_context,
+            )
+
             if payload["format_json"]:
                 response_raw = await llm_service.generate_response(
                     prompt=payload["prompt"],
                     system_prompt=payload["system_prompt"],
-                    require_json=True,
+                    require_json=payload.get("require_api_json", True),
                     image_base64=question.image_base64,
                 )
 
@@ -447,41 +448,50 @@ class SurveyAnalyzer:
 
                 json_block = self._extract_json_block(response_raw)
                 if not json_block:
-                    raise ValueError("El modelo no generó un JSON válido.")
-
-                data = None
-                try:
-                    data = json.loads(json_block)
-                except json.JSONDecodeError:
-                    repaired = self._repair_json(json_block)
-                    data = json.loads(repaired)
-
-                raw_selected = data.get("selected", [])
-                reasoning    = data.get("reasoning", "Opción determinada por el motor de inferencia.")
-
-                selected_options = []
-
-                if question.question_type == QuestionType.CLOZE:
-                    if isinstance(raw_selected, list):
-                        selected_options = list(raw_selected)
+                    # For TEXT questions, the raw response IS the answer
+                    if question.question_type == QuestionType.TEXT:
+                        answer_text = response_raw.strip()
+                        logger.info(f"[DIAG] TEXT question — no JSON block found, using raw response: '{answer_text[:80]}'")
                     else:
-                        logger.warning("CLOZE: 'selected' was not a list.")
+                        raise ValueError("El modelo no generó un JSON válido.")
+                else:
+                    data = None
+                    try:
+                        data = json.loads(json_block)
+                    except json.JSONDecodeError:
+                        repaired = self._repair_json(json_block)
+                        data = json.loads(repaired)
 
-                elif isinstance(raw_selected, list) and raw_selected and isinstance(raw_selected[0], str):
-                    selected_options = answer_matcher.match_many(raw_selected, question.options)
-                    if not selected_options and question.options:
-                        selected_options = self._fuzzy_match_options(raw_selected, question.options, cutoff=0.2)
+                    raw_selected = data.get("selected", [])
+                    reasoning    = data.get("reasoning", "Opción determinada por el motor de inferencia.")
 
-                elif isinstance(raw_selected, list):
-                    selected_options = [
-                        int(x) for x in raw_selected
-                        if str(x).isdigit() or isinstance(x, int)
-                    ]
+                    selected_options = []
 
-                logger.info(f"[DIAG] selected_options = {selected_options}")
+                    if question.question_type in (QuestionType.CLOZE, QuestionType.TEXT):
+                        if isinstance(raw_selected, list) and len(raw_selected) > 0:
+                            selected_options = list(raw_selected)
+                            if question.question_type == QuestionType.TEXT:
+                                answer_text = str(raw_selected[0])
+                        else:
+                            logger.warning(f"{question.question_type.name}: 'selected' was empty — falling back to raw response.")
+                            if question.question_type == QuestionType.TEXT:
+                                answer_text = response_raw.strip()
 
-                if not selected_options:
-                    logger.warning(f"No match for '{question.question_text[:60]}...'")
+                    elif isinstance(raw_selected, list) and raw_selected and isinstance(raw_selected[0], str):
+                        selected_options = answer_matcher.match_many(raw_selected, question.options)
+                        if not selected_options and question.options:
+                            selected_options = self._fuzzy_match_options(raw_selected, question.options, cutoff=0.2)
+
+                    elif isinstance(raw_selected, list):
+                        selected_options = [
+                            int(x) for x in raw_selected
+                            if str(x).isdigit() or isinstance(x, int)
+                        ]
+
+                    logger.info(f"[DIAG] selected_options = {selected_options}")
+
+                    if not selected_options and question.question_type != QuestionType.TEXT:
+                        logger.warning(f"No match for '{question.question_text[:60]}...'")
 
             else:
                 answer_text = await llm_service.generate_response(
@@ -504,8 +514,17 @@ class SurveyAnalyzer:
 
         except Exception as e:
             logger.error(f"analyze_single pipeline error: {e}")
-            answer_text = "Omitido automáticamente para evitar respuestas erróneas."
-            confidence  = 0.0
+            # For TEXT questions, try to salvage the raw LLM response even on error
+            if question.question_type == QuestionType.TEXT:
+                raw_fallback = locals().get("response_raw", None)
+                if raw_fallback:
+                    answer_text = raw_fallback.strip()
+                    logger.warning(f"TEXT question: using raw response as fallback after error: '{answer_text[:80]}'")
+                else:
+                    answer_text = ""
+            else:
+                answer_text = ""
+            confidence = 0.0
 
         return GeneratedAnswer(
             question_text=question.question_text,
@@ -527,9 +546,10 @@ class SurveyAnalyzer:
         Async generator that processes all questions in parallel, throttled by
         asyncio.Semaphore(3) to respect OpenRouter rate limits.
 
-        Yields one JSON-serialisable dict (a GeneratedAnswer) as each question
-        completes, enabling the FastAPI endpoint to stream NDJSON to the client.
-        This powers the real-time progress bar in the extension.
+        Answers are yielded in the SAME ORDER as the input questions so that
+        content.js can pair answer[i] with question[i] positionally.
+        Progress events are still emitted as each task completes so the
+        real-time progress bar in the extension keeps working.
         """
         BATCH_CONCURRENCY = 3
         semaphore = asyncio.Semaphore(BATCH_CONCURRENCY)
@@ -540,23 +560,41 @@ class SurveyAnalyzer:
             and any(f.endswith(".pdf") for f in os.listdir(UPLOAD_DIR))
         )
 
+        completed_count = 0
+
         async def _guarded(question):
+            nonlocal completed_count
             async with semaphore:
-                return await self.analyze_single(
+                result = await self.analyze_single(
                     question=question,
                     user_profile=request.user_profile,
-                    survey_context=None,  # context comes from the LLM prompt
+                    survey_context=None,
                     has_pdfs=has_pdfs,
                 )
+            completed_count += 1
+            logger.info(f"[analyze_batch] {completed_count}/{len(request.questions)} done: '{question.question_text[:50]}'")
+            return result
 
-        # Launch all tasks concurrently — semaphore limits active workers to 3
+        # asyncio.gather preserves input order — answer[i] always matches question[i].
+        # return_exceptions=True prevents one failing task from aborting the whole batch.
         tasks = [asyncio.create_task(_guarded(q)) for q in request.questions]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Yield each answer as soon as it completes (order not guaranteed, but
-        # content.js matches answers to questions by question_text, not position)
-        for coro in asyncio.as_completed(tasks):
-            answer: GeneratedAnswer = await coro
-            yield answer
+        for i, result in enumerate(results):
+            if isinstance(result, BaseException):
+                # A task failed outside analyze_single's own try/except — yield a safe placeholder
+                logger.error(f"[analyze_batch] Task {i} raised unexpectedly: {result}")
+                yield GeneratedAnswer(
+                    question_text=request.questions[i].question_text,
+                    answer="",
+                    confidence=0.0,
+                    reasoning="Error inesperado al procesar la pregunta.",
+                    selected_options=None,
+                    context_used=False,
+                    context_sources=None,
+                )
+            else:
+                yield result
 
 
 # Exportar singleton de la clase orquestadora

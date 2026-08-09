@@ -200,7 +200,7 @@ class SurveyDetector {
             // Note: for matching-row <select> elements the id is overwritten with
             // a guaranteed-unique scp-uid-N value in Caso A below. For all other
             // inputs we preserve any existing id or mint a unique fallback.
-            const id = input.id || `auto_id_${index}`;
+            let id = input.id || `auto_id_${index}`;
             if (!input.id) input.id = id;
 
             // --- SKIP HIDDEN QUESTIONS ---
@@ -236,6 +236,7 @@ class SurveyDetector {
                 // resolves to exactly this <select> and nothing else.
                 const uniqueId = `scp-uid-${_scpUidCounter++}`;
                 input.id = uniqueId;
+                id = uniqueId; // keep local `id` in sync so question object uses stamped ID
 
                 const row               = input.closest('tr');
                 const mainQContainer    = input.closest('.que');

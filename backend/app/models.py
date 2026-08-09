@@ -23,12 +23,14 @@ class DetectedQuestion(BaseModel):
     # embedded in the question (e.g. "Analyze the following diagram").
     image_base64: Optional[str] = None
 
+from typing import List, Optional, Union
+
 class GeneratedAnswer(BaseModel):
     question_text: str
     answer: str
     confidence: float
     reasoning: Optional[str] = None
-    selected_options: Optional[List[int]] = None
+    selected_options: Optional[List[Union[int, str]]] = None
     # Nuevos campos para Fase 2
     context_used: bool = False
     context_sources: Optional[List[str]] = None

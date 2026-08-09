@@ -53,19 +53,22 @@ class SurveyFiller {
             // ── Dispatch to type-specific injector ────────────────────────────
             if (qMap.question_type === 'text') {
                 const element = document.getElementById(qMap.element_id);
-                if (element && ans.answer) {
+                if (!element) {
+                    console.warn(`Survey Copilot Filler: [${i}] text — element "${qMap.element_id}" not found in DOM`);
+                    skipped++;
+                } else if (!ans.answer) {
+                    console.warn(`Survey Copilot Filler: [${i}] text — backend returned no answer text (answer="${ans.answer}", selected_options=${JSON.stringify(ans.selected_options)})`);
+                    skipped++;
+                } else {
                     const answerText = this._extractTextAnswer(ans.answer);
                     if (answerText) {
                         await this.simulateTyping(element, answerText);
                         console.log(`Survey Copilot Filler: [${i}] text → "${answerText}"`);
                         filled++;
                     } else {
-                        console.warn(`Survey Copilot Filler: [${i}] _extractTextAnswer returned empty`);
+                        console.warn(`Survey Copilot Filler: [${i}] _extractTextAnswer returned empty for raw="${ans.answer}"`);
                         skipped++;
                     }
-                } else {
-                    console.warn(`Survey Copilot Filler: [${i}] text — element not found or no answer`);
-                    skipped++;
                 }
             }
 
@@ -290,8 +293,8 @@ class SurveyFiller {
         // ── Plain-text path ─────────────────────────────────────────────
         // Strip surrounding quotes (single or double) and lone brackets
         return trimmed
-            .replace(/^[\"\'\\[\\(]+/, '')
-            .replace(/[\"\'\\]\\)]+$/, '')
+            .replace(/^["'\[\(]+/, '')
+            .replace(/["'\]\)]+$/, '')
             .trim();
     }
 

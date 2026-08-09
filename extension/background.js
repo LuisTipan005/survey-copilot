@@ -116,6 +116,11 @@ async function handleBatchAnalysis(payload, tabId) {
                 if (!trimmed) continue;
                 try {
                     const answerObj = JSON.parse(trimmed);
+                    if (answerObj.error) {
+                        // Backend-emitted error sentinel — do NOT treat as an answer
+                        console.warn("[Survey Copilot BG] Backend reported a stream error:", answerObj.error);
+                        continue;
+                    }
                     answers.push(answerObj);
                     _pushProgress(tabId, answers.length, total);
                 } catch (parseErr) {

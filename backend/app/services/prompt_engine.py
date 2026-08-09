@@ -135,15 +135,22 @@ class PromptEngine:
                 f"{context_block}"
                 f"Question: {question.question_text}\n"
                 f"Context from survey (if any): {question.context or 'None'}\n\n"
-                f"Task: Write a direct, natural response {behavior}.\n"
+                f"Task: Write a direct response {behavior}.\n"
+                "CRITICAL: Respond ONLY with a valid JSON object. No markdown, no prose.\n"
+                "The 'selected' field MUST be a list with exactly ONE string — your concise answer.\n"
                 "CRITICAL RULES FOR TEXT ANSWERS:\n"
-                "1. Answer ONLY the specific question asked. Do NOT add unrelated information.\n"
-                "2. If the DOCUMENT CONTEXT is about a completely different subject than the question, IGNORE IT ENTIRELY and use general knowledge instead.\n"
-                "3. Keep your answer concise and directly relevant to the question.\n"
-                "4. Do not use prefixes like 'Answer:'.\n"
-                "5. Do not generate lists of unrelated questions or examples."
+                "1. Answer ONLY the specific question asked. No unrelated information.\n"
+                "2. If the DOCUMENT CONTEXT is about a completely different subject, IGNORE IT and use general knowledge.\n"
+                "3. Keep your answer concise: a word, number, or very short phrase.\n"
+                "4. Do not use prefixes like 'Answer:'. Do not restate the question.\n\n"
+                "CORRECT example:\n"
+                '{"selected": ["LEAF-SPINE"], "reasoning": "Two-layer ACI fabric topology"}'
             )
-            format_json = False
+            # TEXT uses JSON prompt format, but we do NOT enforce API-level JSON mode
+            # because open-ended answers confuse strict JSON parsers — we handle parsing
+            # ourselves with a plain-text fallback in survey_analyzer.py.
+            format_json       = True
+            require_api_json  = False
 
         elif question.question_type == QuestionType.SINGLE_CHOICE:
             options_text = self._format_options(question.options)
@@ -256,9 +263,10 @@ class PromptEngine:
             format_json = True
 
         return {
-            "prompt": prompt,
-            "system_prompt": system_prompt,
-            "format_json": format_json
+            "prompt":          prompt,
+            "system_prompt":   system_prompt,
+            "format_json":     format_json,
+            "require_api_json": locals().get("require_api_json", format_json),
         }
 
 prompt_engine = PromptEngine()
